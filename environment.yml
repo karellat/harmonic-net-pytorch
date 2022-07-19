@@ -1,0 +1,10 @@
+name: harmonic-net-pytorch
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>3.7
+  - pytorch
+  - torchvision
+  - cudatoolkit=10.2
+  - pip
