@@ -40,7 +40,7 @@ class Conv2d(nn.Module):
             stddev = std_scale*np.sqrt(2.0 / np.prod(fs[:3]))
             W_init = torch.normal(torch.zeros(*fs), stddev)
 
-        W_init =    nn.Parameter(W_init)         
+        W_init = nn.Parameter(W_init)
         return W_init
 
     @staticmethod
@@ -88,7 +88,7 @@ class Conv2d(nn.Module):
             rotation_orders = range(-max_order, max_order+1)
         else:
             diff_order = max_order[1]-max_order[0]
-            rotation_orders = range(-diff, diff+1)
+            rotation_orders = range(-diff_order, diff_order+1)
         phase_dict = {}
         for order in rotation_orders:
             init = np.random.rand(1,1,inp_channel_count,out_channel_count) * 2. *np.pi
@@ -245,6 +245,16 @@ class BatchNorm(nn.Module):
         return Xnormed
 
 
+class HMeanPool(nn.Module):
+    def __init__(self, kernel_size=(1, 1), strides=(1, 1)):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.strides = strides
+
+    def forward(self, x: torch.FloatTensor):
+        return avg_pool(x, kernel_size=self.kernel_size, strides=self.strides)
+
+
 def mean_pool(X, kernel_size=(1,1), strides=(1,1)):
     '''
     Performs avg pooling over the spatial dimensions
@@ -262,6 +272,19 @@ def mean_pool(X, kernel_size=(1,1), strides=(1,1)):
 
     Y = avg_pool(X, kernel_size=kernel_size, strides=strides)
     return Y
+
+
+class HSumMagnitutes(nn.Module):
+    def __init__(self, eps=1e-12, keep_dims=True):
+        super().__init__()
+        self.eps = eps
+        self.keep_dims = keep_dims
+
+    def forward(self, x: torch.FloatTensor):
+        # TODO: Check dimension, seems like a bug
+        R = torch.sum(torch.mul(x, x), dim=(4,), keepdim=self.keep_dims)
+        R = torch.sum(torch.sqrt(torch.clamp(R, self.eps)), dim=(3,), keepdim=self.keep_dims)
+        return R
 
 
 def sum_magnitudes(X, eps=1e-12, keep_dims=True):
@@ -282,4 +305,10 @@ def sum_magnitudes(X, eps=1e-12, keep_dims=True):
     return R
 
 
+class HView(nn.Module):
+    def __init__(self, input_side=28):
+        super(HView, self).__init__()
+        self.shape = (-1, input_side, input_side, 1, 1, 1)
 
+    def forward(self, x: torch.Tensor):
+        return x.view(*self.shape)

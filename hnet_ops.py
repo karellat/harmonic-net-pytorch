@@ -54,9 +54,10 @@ def h_conv(X, W, strides=(1,1,1,1), padding=0, max_order=1):
             weights = W[np.abs(weight_order)]
             sign = np.sign(weight_order)
 
+            #TODO: This could be wrong
             if Xsh[4] == 2:
-                Wr += [weights[0],-sign*weights[1]]
-                Wi += [sign*weights[1],weights[0]]
+                Wr += [weights[0], -sign*weights[1]]
+                Wi += [sign*weights[1], weights[0]]
             else:
                 Wr += [weights[0]]
                 Wi += [weights[1]]
@@ -72,7 +73,7 @@ def h_conv(X, W, strides=(1,1,1,1), padding=0, max_order=1):
     X_ = X_.permute(0, 3, 1, 2)
     Y = torch.nn.functional.conv2d(X_, W_, stride=strides, padding=padding)
     Y = Y.permute(0, 2, 3, 1)
-    # Reshae results into appropriate format
+    # Reshape results into appropriate format
     Ysh = list(Y.size())
     new_shape = Ysh[:3] + [max_order+1,2] + [Ysh[3]//(2*(max_order+1))]
     Y = Y.view(*new_shape)
