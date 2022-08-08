@@ -19,6 +19,7 @@ from torch import nn
 from hnet_ops import *
 from hnet_ops import h_conv
 
+
 class Conv2d(nn.Module):
     '''Defining custom convolutional layer'''
 
@@ -137,6 +138,9 @@ class Conv2d(nn.Module):
         else:
             self.P = None
 
+    def get_filters(self) -> torch.Tensor:
+        return get_filter_weights(self.Q, fs=self.kernel_size, P=self.P, n_rings=self.n_rings)
+
     def forward(self, X):
         '''
         Forward propagation function for the harmonic convolution operation
@@ -148,7 +152,7 @@ class Conv2d(nn.Module):
             R (torch tensor): output feature tensor obtained from harmonic convolution 
         '''
         
-        W = get_filter_weights(self.Q, fs=self.kernel_size, P=self.P, n_rings=self.n_rings)
+        W = self.get_filters()
         R = h_conv(X, W, strides=self.stride, padding=self.padding, max_order=self.max_order)
         return R
 
