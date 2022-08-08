@@ -152,6 +152,7 @@ class Conv2d(nn.Module):
         R = h_conv(X, W, strides=self.stride, padding=self.padding, max_order=self.max_order)
         return R
 
+
 class HNonlin(nn.Module):
     '''
     Nonlinear activation module class based on func handle
@@ -163,14 +164,14 @@ class HNonlin(nn.Module):
     '''
 
 
-    def __init__(self, fnc, rotation_order, channels, eps=1e-12):
+    def __init__(self, fnc, max_order, channels, eps=1e-12):
         super().__init__()
         '''
         Intializer function for getting iput details and nonlinear fn handle
 
         Args:
             fnc (handle): function handle for nonlinear activation
-            rotation_order (int): defines the order of rotation nbeing modeled 
+            max_order (int): number orders modelled in deep net
             channels (int): number of channels
         '''
 
@@ -178,7 +179,7 @@ class HNonlin(nn.Module):
         self.eps = eps
 
         # creating bias parameter to add and initializing using xavier normal method
-        self.b = nn.Parameter(torch.FloatTensor(1,1,1,rotation_order,1,channels))
+        self.b = nn.Parameter(torch.FloatTensor(1, 1, 1, max_order + 1, 1, channels))
         nn.init.xavier_normal_(self.b)
 
     def forward(self, X):
