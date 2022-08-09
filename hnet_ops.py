@@ -15,6 +15,8 @@ import torch.nn.functional as F
 from scipy.linalg import dft
 
 
+def h_conv_order_1(X, W, strides=(1,1,1,1), padding=0):
+    pass
 
 def h_conv(X, W, strides=(1,1,1,1), padding=0, max_order=1):
     """
@@ -197,6 +199,7 @@ def get_filter_weights(R_dict, fs, P=None, n_rings=None):
 
         # Get the basis matrices built from the steerable filters
         weights = get_interpolation_weights(k, m, n_rings=n_rings)
+        #TODO: Fishy
         DFT = dft(N)[m,:]
         low_pass_filter = np.dot(DFT, weights).T
 
