@@ -1,6 +1,6 @@
 """
 Script for creating simple wrapper/interface around the code
-of harmonic network implemenetaions presented in hnet_ops.py.
+of harmonic network implementations presented in hnet_ops.py.
 The goal of this script is to create abstraction around the important
 functions from hnet_ops.py to be similar to standard implementations
 in Pytorch.
@@ -10,16 +10,19 @@ https://github.com/danielewworrall/harmonicConvolutions
 
 """
 
-# importing the necessary dependecies
+# importing the necessary dependencies
 import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
+from loguru import logger
 
 from hnet_ops import *
-from hnet_ops import h_conv
+from hnet_ops import h_conv, h_conv_order_1
 
 
+# TODO: Reimplement str
+# TODO: Remove
 class HConv2dOrder1(nn.Module):
     """
     Harmonic convolution with maximum order 1 (sufficient according to Worrall et al, CVPR, 2017)
@@ -36,19 +39,24 @@ class HConv2dOrder1(nn.Module):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
+        self.kernel_size = kernel_size
         self.n_rings = np.maximum(kernel_size / 2, 2) if n_rings is None else n_rings
         self.shape = (kernel_size, kernel_size, self.in_channels, self.out_channels)
-        self.phase = self.phase
-        # TODO: Check
-        sh = [self.n_rings, *self.shape[2:]]
-        self.Q = {0: Conv2d.get_weights(sh, std_scale=std_scale),
-                  1: Conv2d.get_weights(sh, std_scale=std_scale)}
+        self.phase = phase
+        self.stride = stride
+        self.padding = padding
+        Q_shape = [n_rings, self.in_channels, self.out_channels]
+        # TODO: Resolve delete
+        self.Q = {
+            0: HConv2d.get_weights(Q_shape, std_scale=std_scale),
+            1: HConv2d.get_weights(Q_shape, std_scale=std_scale)
+        }
         self.register_parameter('weights_dict_0', self.Q[0])
         self.register_parameter('weights_dict_1', self.Q[1])
         # TODO: Delete -1  offset
         # Init Phase offset
         if self.phase:
-            self.P = Conv2d.init_phase_dict(self.in_channels, self.out_channels, 1)
+            self.P = HConv2d.init_phase_dict(self.in_channels, self.out_channels, 1)
             for k, v in self.P.items():
                 self.register_parameter('phase_dict_' + str(k), v)
         else:
@@ -59,12 +67,13 @@ class HConv2dOrder1(nn.Module):
 
     def forward(self, X:torch.Tensor):
         W = self.get_filters()
-        return h_conv_max_order1(X, W, strides=self.stride, padding=self.padding)
+        # TODO: Change W to Tensor
+        return h_conv_order_1(X, W, strides=self.stride, padding=self.padding)
 
     pass
 
 
-class Conv2d(nn.Module):
+class HConv2d(nn.Module):
     '''Defining custom convolutional layer'''
 
     @staticmethod
@@ -112,7 +121,7 @@ class Conv2d(nn.Module):
             if ring_count is None:
                 ring_count = np.maximum(layer_shape[0]/2, 2)
             sh = [ring_count,] + list(layer_shape[2:])
-            weights_dict[order] = Conv2d.get_weights(sh, std_scale=std_scale)
+            weights_dict[order] = HConv2d.get_weights(sh, std_scale=std_scale)
         return weights_dict
 
     @staticmethod
@@ -172,11 +181,11 @@ class Conv2d(nn.Module):
         self.stddev = stddev
         self.n_rings = n_rings
         self.shape = (kernel_size, kernel_size, self.in_channels, self.out_channels)
-        self.Q = Conv2d.init_weights_dict(self.shape, self.max_order, self.stddev, self.n_rings)
+        self.Q = HConv2d.init_weights_dict(self.shape, self.max_order, self.stddev, self.n_rings)
         for k, v in self.Q.items():
             self.register_parameter('weights_dict_' + str(k), v)
         if self.phase:
-            self.P = Conv2d.init_phase_dict(self.in_channels, self.out_channels, self.max_order)
+            self.P = HConv2d.init_phase_dict(self.in_channels, self.out_channels, self.max_order)
             for k, v in self.P.items():
                 self.register_parameter('phase_dict_' + str(k), v)
         else:
@@ -211,11 +220,10 @@ class HNonlin(nn.Module):
         eps: regularization since grad |Z| is infinite at zero (default 1e-8)
     '''
 
-
-    def __init__(self, fnc, max_order, channels, eps=1e-12):
+    def __init__(self, fnc, max_order, channels, eps=1e-12, bias=True):
         super().__init__()
         '''
-        Intializer function for getting iput details and nonlinear fn handle
+        Intializer function for getting input details and nonlinear fn handle
 
         Args:
             fnc (handle): function handle for nonlinear activation
@@ -225,6 +233,7 @@ class HNonlin(nn.Module):
 
         self.fnc = fnc
         self.eps = eps
+        self.bias = bias
 
         # creating bias parameter to add and initializing using xavier normal method
         self.b = nn.Parameter(torch.FloatTensor(1, 1, 1, max_order + 1, 1, channels))
@@ -241,14 +250,57 @@ class HNonlin(nn.Module):
             Xnonlin: output feature map after applying nonlinearity
         '''	
         magnitude = concat_feature_magnitudes(X, self.eps)
-        Rb = magnitude + self.b
+        if self.bias:
+            Rb = magnitude + self.b
+        else:
+            Rb = magnitude
         c = self.fnc(Rb) / magnitude
         Xnonlin = c*X
         return Xnonlin
 
 
+class HBatchNorm(nn.Module):
+    """Batch norm module normalizing magnitude of complex numbers"""
+
+    def __init__(self,
+                 channels,
+                 num_orders=2,
+                 harmonic_eps=1e-12,
+                 batch_norm_eps=1e-05,
+                 momentum=0.1,
+                 affine=True):
+        super(HBatchNorm, self).__init__()
+        self.eps = harmonic_eps
+        self.channels = channels
+        self.num_orders = num_orders
+        self.bn = nn.BatchNorm2d(self.channels * self.num_orders,
+                                 eps=batch_norm_eps,
+                                 momentum=momentum,
+                                 affine=affine)
+
+    def forward(self, X: torch.Tensor):
+        magnitude = (
+            concat_feature_magnitudes(X, eps=self.eps, keep_dims=True)
+            # [Batch, Height, Width, Channels * Orders]
+            .view(*X.shape[:3], self.channels * self.num_orders)
+            .permute(0, 3, 1, 2)
+        )
+        norm_magnitude = self.bn(magnitude)
+        norm = (
+            torch.div(norm_magnitude, magnitude)
+            .permute(0, 2, 3, 1)
+            # [Batch, Height, Width, Orders, Complex, Channels]
+            .view(*X.shape[:3], self.num_orders, 1, self.channels)
+        )
+        # TODO: Check out dimensions
+        return norm * X
+
+    def __str__(self):
+        return "HBatchNorm()"
+
+
 class BatchNorm(nn.Module):
-    '''Batch norm module for complex-valued feature maps'''
+    '''Batch norm module for complex-valued feature maps (includes activation func)'''
 
     def __init__(self, rotation_order, cmplx, channels, fnc=F.relu, decay=0.99, eps=1e-4):
         '''
@@ -265,6 +317,7 @@ class BatchNorm(nn.Module):
         '''
 
         super().__init__()
+        logger.warning("Use HBatchNorm; this module is obsolete.")
         self.fnc = fnc
         self.eps = eps
         self.n_out = rotation_order,cmplx,channels
@@ -284,7 +337,7 @@ class BatchNorm(nn.Module):
 
         magnitude = concat_feature_magnitudes(X, self.eps)
         Xsh = tuple(X.size())
-        assert Xsh[-3:]==self.n_out, (Xsh, self.n_out)
+        assert Xsh[-3:] == self.n_out, (Xsh, self.n_out)
         X = X.reshape(-1, self.tn_out)
         Rb = self.bn(X)
         X = X.view(Xsh)
@@ -304,6 +357,19 @@ class HMeanPool(nn.Module):
         return avg_pool(x, kernel_size=self.kernel_size, strides=self.strides)
 
 
+class HLastMNIST(nn.Module):
+    def __init__(self, ncl:int=10):
+        super(HLastMNIST, self).__init__()
+        self.bias = torch.ones(ncl) * 1e-2
+        self.bias = torch.nn.Parameter(self.bias.type(
+            torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor))
+
+    def forward(self, X: torch.Tensor):
+        return torch.mean(X, dim=(1, 2, 3, 4)) + self.bias.view(1, -1)
+
+
+
+
 def mean_pool(X, kernel_size=(1,1), strides=(1,1)):
     '''
     Performs avg pooling over the spatial dimensions
@@ -321,6 +387,19 @@ def mean_pool(X, kernel_size=(1,1), strides=(1,1)):
 
     Y = avg_pool(X, kernel_size=kernel_size, strides=strides)
     return Y
+
+
+class HStackMagnitudes(nn.Module):
+    def __init__(self, eps=1e-12, keep_dims=True):
+        super().__init__()
+        self.eps = eps
+        self.keep_dims = keep_dims
+
+    def forward(self, X: torch.FloatTensor):
+        # TODO: Check dimension, seems like a bug
+        return concat_feature_magnitudes(X,
+                                         eps=self.eps,
+                                         keep_dims=self.keep_dims)
 
 
 class HSumMagnitutes(nn.Module):
@@ -361,3 +440,13 @@ class HView(nn.Module):
 
     def forward(self, x: torch.Tensor):
         return x.view(*self.shape)
+
+
+class HZeroOrder(nn.Module):
+    def __init(self):
+        super().__init__()
+    
+    def forward(self, x: torch.FloatTensor):
+        #Expecting features like [Batch Size, Height, Width, 2|1(Order), 2|1(Complex), Channels]
+        return x[:, :, :, 0:1, ...]
+

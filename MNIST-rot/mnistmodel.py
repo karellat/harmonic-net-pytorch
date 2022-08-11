@@ -9,8 +9,9 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
-from hnet_lite import Conv2d, HNonlin, BatchNorm
+from hnet_lite import HConv2d, HNonlin, BatchNorm
 import hnet_lite as hn_lite
+
 
 class DeepMNIST(nn.Module):
     ''' Pytorch model class for Rot-Equivariant CNN'''
@@ -40,13 +41,13 @@ class DeepMNIST(nn.Module):
             torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor))
 
         # defining convolutional layer objects
-        self.conv2d_1_nf = Conv2d(1, self.nf, self.fs, padding=(self.fs-1)//2, n_rings=self.nr)
-        self.conv2d_nf_nf = Conv2d(self.nf, self.nf, self.fs, padding=(self.fs-1)//2, n_rings=self.nr)
-        self.conv2d_nf_nf2 = Conv2d(self.nf, self.nf2, self.fs, padding=(self.fs-1)//2, n_rings=self.nr)
-        self.conv2d_nf2_nf2 = Conv2d(self.nf2, self.nf2, self.fs, padding=(self.fs-1)//2, n_rings=self.nr)
-        self.conv2d_nf2_nf3 = Conv2d(self.nf2, self.nf3, self.fs, padding=(self.fs-1)//2, n_rings=self.nr)
-        self.conv2d_nf3_nf3 = Conv2d(self.nf3, self.nf3, self.fs, padding=(self.fs-1)//2, n_rings=self.nr)
-        self.conv2d_nf3_ncl = Conv2d(self.nf3, self.ncl, self.fs, padding=(self.fs-1)//2, n_rings=self.nr, phase=False)
+        self.conv2d_1_nf = HConv2d(1, self.nf, self.fs, padding=(self.fs - 1) // 2, n_rings=self.nr)
+        self.conv2d_nf_nf = HConv2d(self.nf, self.nf, self.fs, padding=(self.fs - 1) // 2, n_rings=self.nr)
+        self.conv2d_nf_nf2 = HConv2d(self.nf, self.nf2, self.fs, padding=(self.fs - 1) // 2, n_rings=self.nr)
+        self.conv2d_nf2_nf2 = HConv2d(self.nf2, self.nf2, self.fs, padding=(self.fs - 1) // 2, n_rings=self.nr)
+        self.conv2d_nf2_nf3 = HConv2d(self.nf2, self.nf3, self.fs, padding=(self.fs - 1) // 2, n_rings=self.nr)
+        self.conv2d_nf3_nf3 = HConv2d(self.nf3, self.nf3, self.fs, padding=(self.fs - 1) // 2, n_rings=self.nr)
+        self.conv2d_nf3_ncl = HConv2d(self.nf3, self.ncl, self.fs, padding=(self.fs - 1) // 2, n_rings=self.nr, phase=False)
         
         # defining the nonliearity objects
         self.nonlin1 = HNonlin(F.relu, self.order, self.nf, eps=1e-12)
@@ -103,6 +104,7 @@ class DeepMNIST(nn.Module):
         real = hn_lite.sum_magnitudes(cv7)
         cv7 = torch.mean(real, dim=(1,2,3,4))  
         return (cv7 + self.bias.view(1, -1))
+
 
 class RegularCNN(nn.Module):
 
