@@ -18,59 +18,7 @@ from torch import nn
 from loguru import logger
 
 from hnet_ops import *
-from hnet_ops import h_conv, h_conv_order_1
-
-
-# TODO: Reimplement str
-# TODO: Remove
-class HConv2dOrder1(nn.Module):
-    """
-    Harmonic convolution with maximum order 1 (sufficient according to Worrall et al, CVPR, 2017)
-    """
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 kernel_size: int,
-                 stride: int=1,
-                 padding: int=0,
-                 phase: bool = True,
-                 std_scale:float =0.4,
-                 n_rings=None):
-        super().__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
-        self.n_rings = np.maximum(kernel_size / 2, 2) if n_rings is None else n_rings
-        self.shape = (kernel_size, kernel_size, self.in_channels, self.out_channels)
-        self.phase = phase
-        self.stride = stride
-        self.padding = padding
-        Q_shape = [n_rings, self.in_channels, self.out_channels]
-        # TODO: Resolve delete
-        self.Q = {
-            0: HConv2d.get_weights(Q_shape, std_scale=std_scale),
-            1: HConv2d.get_weights(Q_shape, std_scale=std_scale)
-        }
-        self.register_parameter('weights_dict_0', self.Q[0])
-        self.register_parameter('weights_dict_1', self.Q[1])
-        # TODO: Delete -1  offset
-        # Init Phase offset
-        if self.phase:
-            self.P = HConv2d.init_phase_dict(self.in_channels, self.out_channels, 1)
-            for k, v in self.P.items():
-                self.register_parameter('phase_dict_' + str(k), v)
-        else:
-            self.P = None
-
-    def get_filters(self) -> torch.Tensor:
-        return get_filter_weights(self.Q, fs=self.kernel_size, P=self.P, n_rings=self.n_rings)
-
-    def forward(self, X:torch.Tensor):
-        W = self.get_filters()
-        # TODO: Change W to Tensor
-        return h_conv_order_1(X, W, strides=self.stride, padding=self.padding)
-
-    pass
+from hnet_ops import h_conv
 
 
 class HConv2d(nn.Module):
