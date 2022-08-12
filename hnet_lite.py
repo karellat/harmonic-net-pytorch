@@ -10,11 +10,6 @@ https://github.com/danielewworrall/harmonicConvolutions
 
 """
 
-# importing the necessary dependencies
-import numpy as np
-import torch
-import torch.nn.functional as F
-from torch import nn
 from loguru import logger
 
 from hnet_ops import *
@@ -39,7 +34,7 @@ class HConv2d(nn.Module):
         """
 
         if W_init == None:
-            stddev = std_scale*np.sqrt(2.0 / np.prod(fs[:3]))
+            stddev = std_scale * np.sqrt(2.0 / np.prod(fs[:3]))
             W_init = torch.normal(torch.zeros(*fs), stddev)
 
         W_init = nn.Parameter(W_init)
@@ -60,15 +55,15 @@ class HConv2d(nn.Module):
         """
 
         if isinstance(max_order, int):
-            rotation_orders = range(-max_order, max_order+1)
+            rotation_orders = range(-max_order, max_order + 1)
         else:
-            diff_order = max_order[1]-max_order[0]
-            rotation_orders = range(-diff_order, diff_order+1)
+            diff_order = max_order[1] - max_order[0]
+            rotation_orders = range(-diff_order, diff_order + 1)
         weights_dict = {}
         for order in rotation_orders:
             if ring_count is None:
-                ring_count = np.maximum(layer_shape[0]/2, 2)
-            sh = [ring_count,] + list(layer_shape[2:])
+                ring_count = np.maximum(layer_shape[0] / 2, 2)
+            sh = [ring_count, ] + list(layer_shape[2:])
             weights_dict[order] = HConv2d.get_weights(sh, std_scale=std_scale)
         return weights_dict
 
@@ -87,20 +82,20 @@ class HConv2d(nn.Module):
         """
 
         if isinstance(max_order, int):
-            rotation_orders = range(-max_order, max_order+1)
+            rotation_orders = range(-max_order, max_order + 1)
         else:
-            diff_order = max_order[1]-max_order[0]
-            rotation_orders = range(-diff_order, diff_order+1)
+            diff_order = max_order[1] - max_order[0]
+            rotation_orders = range(-diff_order, diff_order + 1)
         phase_dict = {}
         for order in rotation_orders:
-            init = np.random.rand(1,1,inp_channel_count,out_channel_count) * 2. *np.pi
+            init = np.random.rand(1, 1, inp_channel_count, out_channel_count) * 2. * np.pi
             init = torch.from_numpy(init)
             phase = nn.Parameter(init)
             phase_dict[order] = phase
         return phase_dict
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, phase=True,
-             max_order=1, stddev=0.4, n_rings=None):
+                 max_order=1, stddev=0.4, n_rings=None):
         super().__init__()
         '''
         initializer function for Harmonic convolution lite wrapper class
@@ -117,7 +112,7 @@ class HConv2d(nn.Module):
             phase (boolean): to decide whether the phase-offset term is used (default True)
             max_order (int): max. order of roation to be modeled(default: 1)
             stddev (float): scaling term for He weight initialization
-        ''' 
+        '''
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -152,7 +147,7 @@ class HConv2d(nn.Module):
         Returns:
             R (torch tensor): output feature tensor obtained from harmonic convolution 
         '''
-        
+
         W = self.get_filters()
         R = h_conv(X, W, strides=self.stride, padding=self.padding, max_order=self.max_order)
         return R
@@ -196,14 +191,14 @@ class HNonlin(nn.Module):
 
         Returns: 
             Xnonlin: output feature map after applying nonlinearity
-        '''	
+        '''
         magnitude = concat_feature_magnitudes(X, self.eps)
         if self.bias:
             Rb = magnitude + self.b
         else:
             Rb = magnitude
         c = self.fnc(Rb) / magnitude
-        Xnonlin = c*X
+        Xnonlin = c * X
         return Xnonlin
 
 
@@ -268,9 +263,9 @@ class BatchNorm(nn.Module):
         logger.warning("Use HBatchNorm; this module is obsolete.")
         self.fnc = fnc
         self.eps = eps
-        self.n_out = rotation_order,cmplx,channels
-        self.tn_out = rotation_order*cmplx*channels
-        self.bn = nn.BatchNorm1d(self.tn_out, eps=self.eps, momentum=1-decay)
+        self.n_out = rotation_order, cmplx, channels
+        self.tn_out = rotation_order * cmplx * channels
+        self.bn = nn.BatchNorm1d(self.tn_out, eps=self.eps, momentum=1 - decay)
 
     def forward(self, X: torch.Tensor):
         '''
@@ -291,7 +286,7 @@ class BatchNorm(nn.Module):
         X = X.view(Xsh)
         Rb = Rb.view(Xsh)
         c = self.fnc(Rb) / magnitude
-        Xnormed = c*X
+        Xnormed = c * X
         return Xnormed
 
 
@@ -306,7 +301,7 @@ class HMeanPool(nn.Module):
 
 
 class HLastMNIST(nn.Module):
-    def __init__(self, ncl:int=10):
+    def __init__(self, ncl: int = 10):
         super(HLastMNIST, self).__init__()
         self.bias = torch.ones(ncl) * 1e-2
         self.bias = torch.nn.Parameter(self.bias.type(
@@ -316,9 +311,7 @@ class HLastMNIST(nn.Module):
         return torch.mean(X, dim=(1, 2, 3, 4)) + self.bias.view(1, -1)
 
 
-
-
-def mean_pool(X, kernel_size=(1,1), strides=(1,1)):
+def mean_pool(X, kernel_size=(1, 1), strides=(1, 1)):
     '''
     Performs avg pooling over the spatial dimensions
 
@@ -376,8 +369,8 @@ def sum_magnitudes(X, eps=1e-12, keep_dims=True):
         R (torch tensor): output feature maps 
     '''
 
-    R = torch.sum(torch.mul(X,X), dim=(4,), keepdim=keep_dims)
-    R = torch.sum(torch.sqrt(torch.clamp(R,eps)), dim=(3,), keepdim=keep_dims)
+    R = torch.sum(torch.mul(X, X), dim=(4,), keepdim=keep_dims)
+    R = torch.sum(torch.sqrt(torch.clamp(R, eps)), dim=(3,), keepdim=keep_dims)
     return R
 
 
@@ -393,8 +386,7 @@ class HView(nn.Module):
 class HZeroOrder(nn.Module):
     def __init(self):
         super().__init__()
-    
-    def forward(self, x: torch.FloatTensor):
-        #Expecting features like [Batch Size, Height, Width, 2|1(Order), 2|1(Complex), Channels]
-        return x[:, :, :, 0:1, ...]
 
+    def forward(self, x: torch.FloatTensor):
+        # Expecting features like [Batch Size, Height, Width, 2|1(Order), 2|1(Complex), Channels]
+        return x[:, :, :, 0:1, ...]
