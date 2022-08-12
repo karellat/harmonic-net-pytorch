@@ -11,6 +11,7 @@ https://github.com/danielewworrall/harmonicConvolutions
 """
 
 from loguru import logger
+from torch import nn
 
 from hnet_ops import *
 from hnet_ops import h_conv
