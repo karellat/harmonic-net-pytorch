@@ -217,30 +217,39 @@ class HBatchNorm(nn.Module):
         self.eps = harmonic_eps
         self.channels = channels
         self.num_orders = num_orders
-        self.bn = nn.BatchNorm2d(self.channels * self.num_orders,
+        self.bn = nn.BatchNorm3d(self.channels,
                                  eps=batch_norm_eps,
                                  momentum=momentum,
                                  affine=affine)
 
     def forward(self, X: torch.Tensor):
+        # input X - [Batch, Height, Width, Orders, Complex, Channels]
+        # TODO: Add mask tensor
         magnitude = (
             concat_feature_magnitudes(X, eps=self.eps, keep_dims=True)
-            # [Batch, Height, Width, Channels * Orders]
-            .view(*X.shape[:3], self.channels * self.num_orders)
-            .permute(0, 3, 1, 2)
+            # [Batch, Height, Width, Orders, Channels]
+            .view(*X.shape[:4],  self.channels)
+            # [Batch, Channels, Height, Width, Orders] - BatchNorm shape
+            .permute(0, 4, 1, 2, 3)
         )
+
         norm_magnitude = self.bn(magnitude)
+
         norm = (
             torch.div(norm_magnitude, magnitude)
-            .permute(0, 2, 3, 1)
+            .permute(0, 2, 3, 4, 1)
             # [Batch, Height, Width, Orders, Complex, Channels]
-            .view(*X.shape[:3], self.num_orders, 1, self.channels)
+            .view(*X.shape[:4], 1, self.channels)
         )
         # TODO: Check out dimensions
         return norm * X
 
     def __str__(self):
         return "HBatchNorm()"
+
+    def train(self, mode: bool = True):
+        super(HBatchNorm, self).train(mode=mode)
+        self.bn.train(mode=mode)
 
 
 class BatchNorm(nn.Module):
