@@ -9,7 +9,7 @@ harmonic networks available at
 https://github.com/danielewworrall/harmonicConvolutions
 
 """
-
+import torch
 from loguru import logger
 from torch import nn
 
@@ -234,14 +234,15 @@ class HBatchNorm(nn.Module):
         )
 
         norm_magnitude = self.bn(magnitude)
-
         norm = (
             torch.div(norm_magnitude, magnitude)
             .permute(0, 2, 3, 4, 1)
             # [Batch, Height, Width, Orders, Complex, Channels]
             .view(*X.shape[:4], 1, self.channels)
         )
-        # TODO: Check out dimensions
+        # TODO: What about infs
+        # Remove nans
+        X[X != X] = 0.0
         return norm * X
 
     def __str__(self):
