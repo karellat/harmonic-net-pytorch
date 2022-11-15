@@ -224,7 +224,6 @@ class HBatchNorm(nn.Module):
 
     def forward(self, X: torch.Tensor):
         # input X - [Batch, Height, Width, Orders, Complex, Channels]
-        # TODO: Add mask tensor
         magnitude = (
             concat_feature_magnitudes(X, eps=self.eps, keep_dims=True)
             # [Batch, Height, Width, Orders, Channels]
@@ -236,14 +235,10 @@ class HBatchNorm(nn.Module):
         norm_magnitude = self.bn(magnitude)
         norm = (
             torch.div(norm_magnitude, torch.clamp(magnitude, min=self.eps))
-            #torch.div(norm_magnitude, magnitude)
             .permute(0, 2, 3, 4, 1)
             # [Batch, Height, Width, Orders, Complex, Channels]
             .view(*X.shape[:4], 1, self.channels)
         )
-        # TODO: What about infs
-        # Remove nans
-        X[X != X] = 0.0
         return norm * X
 
     def __str__(self):
