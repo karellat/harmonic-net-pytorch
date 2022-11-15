@@ -69,10 +69,6 @@ def h_conv(X, W, strides=(1, 1, 1, 1), padding=0, max_order=1):
         else W_.type(torch.FloatTensor)
 
     X_ = X_.permute(0, 3, 1, 2)
-    assert torch.all(~torch.isnan(W_)), "Some of HCONV weights are NAN."
-    assert torch.all(~torch.isnan(X_)), "Some of HCONV inputs are NAN."
-    assert torch.all(~torch.isinf(W_)), "Some of HCONV weights are INF."
-    assert torch.all(~torch.isinf(X_)), "Some of HCONV inputs are INF."
     Y = torch.nn.functional.conv2d(X_, W_, stride=strides, padding=padding)
     Y = Y.permute(0, 2, 3, 1)
     # Reshape results into appropriate format
