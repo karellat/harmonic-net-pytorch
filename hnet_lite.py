@@ -235,7 +235,8 @@ class HBatchNorm(nn.Module):
 
         norm_magnitude = self.bn(magnitude)
         norm = (
-            torch.div(norm_magnitude, magnitude)
+            torch.div(norm_magnitude, torch.clamp(magnitude, min=self.eps))
+            #torch.div(norm_magnitude, magnitude)
             .permute(0, 2, 3, 4, 1)
             # [Batch, Height, Width, Orders, Complex, Channels]
             .view(*X.shape[:4], 1, self.channels)
