@@ -198,6 +198,8 @@ class HNonlin(nn.Module):
             Rb = magnitude + self.b
         else:
             Rb = magnitude
+
+        assert torch.all(magnitude != 0), "Activation function normalization by zero"
         c = self.fnc(Rb) / magnitude
         Xnonlin = c * X
         return Xnonlin

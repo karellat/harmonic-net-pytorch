@@ -168,9 +168,14 @@ def get_interpolation_weights(fs, m, n_rings=None):
     weights = np.exp(-0.5 * dist2 / (0.5 ** 2))  # For bandwidth of 0.5
 
     # Normalizing the weights to calibrate the different steerable filters
-    assert np.alltrue(np.sum(weights, axis=2, keepdims=True) != 0)
-    norm_weights = weights / np.sum(weights, axis=2, keepdims=True)
-    return norm_weights
+    norm = np.sum(weights,
+                  axis=2,
+                  keepdims=True)
+    assert np.alltrue(norm != 0), "Normalizing by zero weights"
+    return np.divide(weights,
+                     norm,
+                     where=(norm != 0)
+                     )
 
 
 def get_filter_weights(R_dict, fs, P=None, n_rings=None):
