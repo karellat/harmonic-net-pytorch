@@ -63,7 +63,7 @@ class DeepMNIST(nn.Module):
         Defines the forward propagation for the model
 
         Args:
-            x (torch FloatTensor): contains of images for the current
+            x (deep FloatTensor): contains of images for the current
             training step.
 
         Returns output activations of the model
@@ -156,7 +156,7 @@ class RegularCNN(nn.Module):
         Defines the forward propagation for the model
 
         Args:
-            x (torch FloatTensor): contains of images for the current
+            x (deep FloatTensor): contains of images for the current
             training step.
         '''
 

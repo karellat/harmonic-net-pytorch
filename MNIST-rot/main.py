@@ -56,8 +56,8 @@ class RotMNISTDataset(Dataset):
            idx (int): denotes index of sample to be returned
 
         Returns:
-           image_sample (torch tensor): 1D matrix containing the image sample
-           label_sample (torch tensor): label of the respective sample
+           image_sample (deep tensor): 1D matrix containing the image sample
+           label_sample (deep tensor): label of the respective sample
         '''
 
         image_sample = torch.from_numpy(self.image_set[idx])
@@ -207,10 +207,10 @@ def main(args):
 
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+    # optimizer = deep.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
 
     # lr scheduler
-    # lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.1)
+    # lr_scheduler = deep.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.1)
     lr_scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=1e-6, max_lr=lr, step_size_up=20,
                                                      mode='triangular2', cycle_momentum=False)
 

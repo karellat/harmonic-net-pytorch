@@ -10,11 +10,12 @@ https://github.com/danielewworrall/harmonicConvolutions
 # Importing the necessary dependencies
 import numpy as np
 import torch
+from loguru import logger
 import torch.nn.functional as F
 from scipy.linalg import dft
 
 
-def h_conv(X, W, strides=(1, 1, 1, 1), padding=0, max_order=1):
+def h_conv(X, W, in_max_order, out_max_order, strides=(1, 1, 1, 1), padding=0):
     """
     This functions performs harmonic convolution operation between the input X
     and weights W. Harmonic convolutions between different orders, also referred
@@ -30,29 +31,33 @@ def h_conv(X, W, strides=(1, 1, 1, 1), padding=0, max_order=1):
         we provide a 4-size tuple here. The dimensions N and c as per convention are 
         also set to 1.(default (1,1,1,1))
         padding: as per the Pytorch conv2d convention (default: 0)
-        max_order: max. order of roation to be modeled(default: 1)
+        in_max_order: max. order of rotation input channels
+        out_max_order: max. order of rotation output channels
 
     Returns:
         Y: 
     """
+    assert X.shape[3] == (in_max_order + 1)
 
     Xsh = list(X.size())
     X_ = X.view(Xsh[:3] + [-1])  # flatten out the last 3 dimensions
 
+
     # To convert the stream convolutions into a stacked single filter, we
     # combine the components of real and imaginary parts 
     W_ = []
-    for out_order in range(max_order + 1):
+    for out_order in range(out_max_order + 1):
         # For each output order build input
         Wr = []
         Wi = []
-        for inp_order in range(Xsh[3]):
+        for inp_order in range(in_max_order + 1):
             # Difference in orders is the convolution order
             weight_order = out_order - inp_order
             weights = W[np.abs(weight_order)]
             sign = np.sign(weight_order)
 
             # TODO: This could be wrong
+            # dimension 4 is complex
             if Xsh[4] == 2:
                 Wr += [weights[0], -sign * weights[1]]
                 Wi += [sign * weights[1], weights[0]]
@@ -70,10 +75,15 @@ def h_conv(X, W, strides=(1, 1, 1, 1), padding=0, max_order=1):
 
     X_ = X_.permute(0, 3, 1, 2)
     Y = torch.nn.functional.conv2d(X_, W_, stride=strides, padding=padding)
+    with open('X_.npy', 'wb') as f:
+        np.save(f, X_.detach().cpu().numpy())
+    with open('W_.npy', 'wb') as f:
+        np.save(f, W_.detach().cpu().numpy())
+
     Y = Y.permute(0, 2, 3, 1)
     # Reshape results into appropriate format
     Ysh = list(Y.size())
-    new_shape = Ysh[:3] + [max_order + 1, 2] + [Ysh[3] // (2 * (max_order + 1))]
+    new_shape = Ysh[:3] + [out_max_order + 1, 2] + [Ysh[3] // (2 * (out_max_order + 1))]
     Y = Y.view(*new_shape)
     return Y
 
@@ -83,14 +93,14 @@ def avg_pool(X, kernel_size=(1, 1), strides=(1, 1)):
     Performs average pooling across the real as well as imaginary-valued feature maps.
 
     Args:
-        X (torch tensor): Input image tensor of shape (bs,h,w,order,complex,channels)
+        X (deep tensor): Input image tensor of shape (bs,h,w,order,complex,channels)
         kernel_size (int tuple): defines pooling kernel size
         strides (tuple of ints): tuple denoting strides for h and w directions. Similar
         to the original tf code as well as the pytorch tuple standard format for stride,
         we provide a 4-size tuple here. The dimensions N and c as per convention are 
         also set to 1.(default (1,1,1,1))
     Returns:
-        Y (torch tensor): Output features after applying average pooling
+        Y (deep tensor): Output features after applying average pooling
     '''
 
     Xsh = list(X.size())
@@ -105,7 +115,7 @@ def avg_pool(X, kernel_size=(1, 1), strides=(1, 1)):
     return Y
 
 
-def concat_feature_magnitudes(X, eps=1e-12, keep_dims=True):
+def concat_feature_magnitudes(x, eps=1e-12, keep_dims=True):
     '''
     Concat the complex feature magnitudes in X.
 
@@ -115,10 +125,10 @@ def concat_feature_magnitudes(X, eps=1e-12, keep_dims=True):
         eps (float): regularization term for min clamping
 
     Returns:
-        R (torch tensor): concatenated feature maps
+        R (deep tensor): concatenated feature maps
     '''
 
-    R = torch.sum(torch.mul(X, X), dim=(4,), keepdim=keep_dims)
+    R = torch.sum(torch.mul(x, x), dim=(4,), keepdim=keep_dims)
     R = torch.sqrt(torch.clamp(R, min=eps))
     return R
 
