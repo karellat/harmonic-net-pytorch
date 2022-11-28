@@ -373,6 +373,8 @@ class HMeanPool(nn.Module):
         self.strides = strides
 
     def forward(self, x: torch.FloatTensor):
+        if (x.shape[1] % 2 == 1) or (x.shape[2] % 2 == 1):
+            logger.warning(f"Pooling layers could be misaligned, odd shape of input image = {x.shape}")
         return avg_pool(x, kernel_size=self.kernel_size, strides=self.strides)
 
 
@@ -380,8 +382,8 @@ class HLastMNIST(nn.Module):
     def __init__(self, ncl: int = 10):
         super(HLastMNIST, self).__init__()
         self.bias = torch.ones(ncl) * 1e-2
-        self.bias = torch.nn.Parameter(self.bias.type(
-            torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor))
+        self.bias = self.bias.type(torch.get_default_dtype())
+        self.bias = torch.nn.Parameter(self.bias)
 
     def forward(self, x: torch.Tensor):
         """
