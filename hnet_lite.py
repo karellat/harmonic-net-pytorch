@@ -10,7 +10,9 @@ https://github.com/danielewworrall/harmonicConvolutions
 
 """
 import torch
+import numpy as np
 from loguru import logger
+from typing import Dict, Tuple
 from torch import nn
 
 from hnet_ops import *
@@ -64,7 +66,7 @@ class HConv2d(nn.Module):
         weights_dict = {}
         for order in rotation_orders:
             if ring_count is None:
-                ring_count = np.maximum(layer_shape[0] / 2, 2)
+                ring_count = int(np.maximum(layer_shape[0] / 2, 2))
             sh = [ring_count, ] + list(layer_shape[2:])
             weights_dict[order] = HConv2d.get_weights(sh, std_scale=std_scale)
         return weights_dict
@@ -151,8 +153,52 @@ class HConv2d(nn.Module):
         else:
             self.P = None
 
-    def get_filters(self) -> torch.Tensor:
-        return get_filter_weights(self.Q, fs=self.kernel_size, P=self.P, n_rings=self.n_rings)
+        # low pass filters
+        N = get_sample_count(self.kernel_size)
+        self.low_pass_filters = torch.nn.ParameterDict()
+        for m in self.Q.keys():
+            # Get the basis matrices built from the steerable filters
+            weights = get_interpolation_weights(self.kernel_size, m, n_rings=self.n_rings)
+            low_pass_filter = np.dot(dft(N)[m, :], weights).T
+            cos_comp = torch.nn.Parameter(torch.from_numpy(np.real(low_pass_filter)).to(torch.get_default_dtype()),
+                                          requires_grad=False)
+            sin_comp = torch.nn.Parameter(torch.from_numpy(np.imag(low_pass_filter)).to(torch.get_default_dtype()),
+                                          requires_grad=False)
+            self.low_pass_filters[f"cos_comp_{m}"] = cos_comp
+            self.low_pass_filters[f"sin_comp_{m}"] = sin_comp
+
+    def get_filters(self) -> Dict[int, Tuple[torch.Tensor, torch.Tensor]]:
+        '''
+        Calculates filters in the form of weight matrices through performing
+        single-frequency DFT on every ring obtained from sampling in the polar
+        domain.
+
+        Args:
+            R_dict (dict): contains initialization weights
+            fs (int): filter size for the h-net convolutional layer
+
+        Returns:
+            W (dict): contains the filter matrices
+        '''
+        W = {}  # dict to store the filter matrices
+
+        for m, r in self.Q.items():
+            rsh = list(r.size())
+            cos_comp = self.low_pass_filters[f'cos_comp_{m}']
+            sin_comp = self.low_pass_filters[f'sin_comp_{m}']
+            # Computing the projetions on the rotational basis
+            r = r.view(rsh[0], rsh[1] * rsh[2])
+            ucos = torch.matmul(cos_comp, r).view(self.kernel_size, self.kernel_size, rsh[1], rsh[2])
+            usin = torch.matmul(sin_comp, r).view(self.kernel_size, self.kernel_size, rsh[1], rsh[2])
+
+            if self.P is not None:
+                # Rotating the basis matrices
+                ucos_ = torch.cos(self.P[m]) * ucos + torch.sin(self.P[m]) * usin
+                usin = -torch.sin(self.P[m]) * ucos + torch.cos(self.P[m]) * usin
+                ucos = ucos_
+            W[m] = (ucos, usin)
+
+        return W
 
     def forward(self, X):
         '''

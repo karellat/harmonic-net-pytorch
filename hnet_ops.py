@@ -70,15 +70,10 @@ def h_conv(X, W, in_max_order, out_max_order, strides=(1, 1, 1, 1), padding=0):
 
     # Convolving the constructed weights and feature map
     W_ = W_.permute(3, 2, 0, 1)
-    W_ = W_.type(torch.cuda.FloatTensor) if torch.cuda.is_available() \
-        else W_.type(torch.FloatTensor)
+    W_ = W_.type(X_.dtype)
 
     X_ = X_.permute(0, 3, 1, 2)
     Y = torch.nn.functional.conv2d(X_, W_, stride=strides, padding=padding)
-    with open('X_.npy', 'wb') as f:
-        np.save(f, X_.detach().cpu().numpy())
-    with open('W_.npy', 'wb') as f:
-        np.save(f, W_.detach().cpu().numpy())
 
     Y = Y.permute(0, 2, 3, 1)
     # Reshape results into appropriate format
