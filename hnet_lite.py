@@ -396,10 +396,8 @@ class HLastMNIST(nn.Module):
         -------
 
         """
-        if x.shape[3] != 1:
-            logger.warning(f"""Last layer contains order of rank higher than zero, got shape={x.shape} \
-             ([Batch Size, Height, Width, Order, Complex, Channels])""")
-        return torch.mean(x, dim=(1, 2, 3, 4)) + self.bias.view(1, -1)
+        assert x.ndim == 4
+        return torch.mean(x, dim=(1, 2)) + self.bias.view(1, -1)
 
 
 def mean_pool(X, kernel_size=(1, 1), strides=(1, 1)):
