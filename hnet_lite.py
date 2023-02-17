@@ -469,8 +469,10 @@ class HView(nn.Module):
         super(HView, self).__init__()
 
     def forward(self, x: torch.Tensor):
+        # From [Batch Size, Channels, Height, Width
         # Expand Tensor to Hnet dimensions [Batch Size, Height, Width, Order, Complex, Channels]
-        return x[:, 0, :, :, None, None, None]
+        _x = x.permute((0, 2, 3, 1))
+        return _x[:, :, :, None, None, None, :]
 
 
 class HZeroOrder(nn.Module):
